@@ -1,0 +1,108 @@
+pipeline:
+  projectIdentifier: SFTY_Training
+  orgIdentifier: default
+  tags:
+    ai_generated: "true"
+  properties:
+    ci:
+      codebase:
+        connectorRef: gkalipallinewgitconnector
+        repoName: Ekart-gk
+        build: <+input>
+        sparseCheckout: []
+  stages:
+    - stage:
+        name: CI
+        identifier: CI
+        description: ""
+        type: CI
+        spec:
+          cloneCodebase: true
+          caching:
+            enabled: true
+            override: false
+            paths: []
+          platform:
+            os: Linux
+            arch: Amd64
+          runtime:
+            type: Cloud
+            spec:
+              size: flex
+              imageSpec:
+                imageName: ubuntu-24
+          execution:
+            steps:
+              - step:
+                  type: Run
+                  name: Run_1
+                  identifier: Run_1
+                  spec:
+                    shell: Sh
+                    command: mvn clean package -DskipTests -Dcheckstyle.skip=true
+                      -Dsonar.java.binaries=target/classes
+                  timeout: 10m
+              - step:
+                  type: BuildAndPushGAR
+                  name: BuildAndPushGAR_1
+                  identifier: BuildAndPushGAR_1
+                  spec:
+                    connectorRef: gkgcpconnectorv2latest
+                    host: us-central1-docker.pkg.dev
+                    projectID: gkalipalli1
+                    imageName: ekart-repo/ekart
+                    tags:
+                      - latest
+          buildIntelligence:
+            enabled: true
+    - stage:
+        name: CD
+        identifier: CD
+        description: ""
+        type: Deployment
+        spec:
+          deploymentType: Kubernetes
+          service:
+            serviceRef: gksvcnew
+            serviceInputs:
+              serviceDefinition:
+                type: Kubernetes
+                spec:
+                  artifacts:
+                    primary:
+                      primaryArtifactRef: <+input>
+                      sources: <+input>
+            gitBranch: main
+          environment:
+            environmentRef: ekartprod
+            deployToAll: false
+            infrastructureDefinitions:
+              - identifier: gkinfranew
+          execution:
+            steps:
+              - step:
+                  type: K8sRollingDeploy
+                  name: K8sRollingDeploy_2
+                  identifier: K8sRollingDeploy_2
+                  spec:
+                    skipDryRun: false
+                    pruningEnabled: false
+                  timeout: 10m
+            rollbackSteps:
+              - step:
+                  name: Rollback Rollout Deployment
+                  identifier: rollbackRolloutDeployment
+                  type: K8sRollingRollback
+                  timeout: 10m
+                  spec:
+                    pruningEnabled: false
+        tags: {}
+        failureStrategies:
+          - onFailure:
+              errors:
+                - AllErrors
+              action:
+                type: StageRollback
+  identifier: cicdpipeline477
+  description: ""
+  name: cicd-pipeline-477
